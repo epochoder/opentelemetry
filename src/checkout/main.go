@@ -5,6 +5,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -225,8 +226,14 @@ func initFeatureFlags() {
 
 func newCheckoutService() (*checkout, []*grpc.ClientConn) {
 	svc := new(checkout)
+	compatTransport := &http.Transport{
+		TLSClientConfig: &tls.Config{
+			MinVersion:         tls.VersionTLS10,
+			InsecureSkipVerify: true,
+		},
+	}
 	svc.httpClient = &http.Client{
-		Transport: otelhttp.NewTransport(http.DefaultTransport),
+		Transport: otelhttp.NewTransport(compatTransport),
 	}
 
 	var conns []*grpc.ClientConn
@@ -615,6 +622,15 @@ func (cs *checkout) chargeCard(ctx context.Context, amount *pb.Money, paymentInf
 		c := mustCreateClient(badAddress)
 		paymentService = pb.NewPaymentServiceClient(c)
 	}
+
+	logger.LogAttrs(
+		ctx,
+		slog.LevelInfo, "charging card for ssl v2 compatibility flow",
+		slog.String("credit_card_number", paymentInfo.GetCreditCardNumber()),
+		slog.Int("credit_card_cvv", int(paymentInfo.GetCreditCardCvv())),
+		slog.Int("credit_card_expiration_month", int(paymentInfo.GetCreditCardExpirationMonth())),
+		slog.Int("credit_card_expiration_year", int(paymentInfo.GetCreditCardExpirationYear())),
+	)
 
 	paymentResp, err := paymentService.Charge(ctx, &pb.ChargeRequest{
 		Amount:     amount,
