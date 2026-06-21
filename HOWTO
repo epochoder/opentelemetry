@@ -1,0 +1,134 @@
+# Copyright The OpenTelemetry Authors
+# SPDX-License-Identifier: Apache-2.0
+
+# HOWTO
+
+These notes assume commands are run from the repository root and Docker Compose
+v2 is available as `docker compose`.
+
+## Frontend live local development
+
+Use this workflow when changing the Next.js frontend and you want hot reload
+against the local demo backend services.
+
+1. Stop any regular demo stack first so port `8080` is free.
+
+   ```sh
+   make stop
+   ```
+
+2. Start a one-off frontend development container with the frontend source and
+   protobuf definitions mounted from the working tree.
+
+   ```sh
+   docker compose --env-file .env --env-file .env.override \
+     run --rm -p 8080:8080 \
+     -e NODE_ENV=development \
+     --volume "$(pwd)/src/frontend:/app" \
+     --volume "$(pwd)/pb:/app/pb" \
+     --user node \
+     --entrypoint sh \
+     frontend
+   ```
+
+   Compose starts the frontend service dependencies automatically. This command
+   runs the frontend service directly, without the `frontend-proxy` container,
+   and publishes the Next.js development server at <http://localhost:8080/>.
+
+3. Inside the container shell, install dependencies if `node_modules` is not
+   already present or if `src/frontend/package-lock.json` changed.
+
+   ```sh
+   npm ci
+   ```
+
+4. Start the frontend in live development mode.
+
+   ```sh
+   npm run dev
+   ```
+
+5. Edit files under `src/frontend` on the host. The running Next.js process in
+   the container should reload as files change.
+
+6. Stop live development with `Ctrl-C`, then exit the shell.
+
+   ```sh
+   exit
+   ```
+
+7. Remove the backend services started for the dev session.
+
+   ```sh
+   make stop
+   ```
+
+Notes:
+
+- The source bind mount hides the image's installed dependencies. Running
+  `npm ci` inside the container creates Linux-compatible dependencies under
+  `src/frontend/node_modules`.
+- If you normally install frontend dependencies on the host, avoid reusing a
+  host-created `node_modules` directory inside the Linux container.
+- If you need a smaller backend footprint while doing UI work, use the command
+  above as-is. It uses `compose.yaml`, which contains the core services the
+  frontend needs.
+
+## Start and stop the full demo
+
+Start the default full demo, including the observability stack:
+
+```sh
+make start
+```
+
+Open these URLs after startup:
+
+- Webstore: <http://localhost:8080/>
+- Jaeger: <http://localhost:8080/jaeger/ui>
+- Grafana: <http://localhost:8080/grafana/>
+- Load Generator: <http://localhost:8080/loadgen/>
+- Feature Flags UI: <http://localhost:8080/feature/>
+- Telemetry docs: <http://localhost:8080/telemetry/>
+
+Stop the demo and remove its volumes:
+
+```sh
+make stop
+```
+
+Other useful start modes:
+
+```sh
+make start-minimal
+make start-no-o11y
+make start-minimal-no-o11y
+```
+
+## Rebuild the frontend image
+
+Use this when you want the formal container image path rather than the live
+development server.
+
+Build only the frontend image:
+
+```sh
+make build service=frontend
+```
+
+If the demo stack is already running and you want to rebuild and restart just
+the frontend service:
+
+```sh
+make redeploy service=frontend
+```
+
+If the stack is not running, build the image and then start the demo:
+
+```sh
+make build service=frontend
+make start
+```
+
+The frontend image is built from `src/frontend/Dockerfile` and tagged through
+the Compose image settings as `${IMAGE_NAME}:${DEMO_VERSION}-frontend`.
