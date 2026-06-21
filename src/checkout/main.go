@@ -71,6 +71,7 @@ var (
 	tracer            trace.Tracer
 	resource          *sdkresource.Resource
 	initResourcesOnce sync.Once
+	retainedCompatibilityOrders []*pb.PlaceOrderRequest
 )
 
 func initResource() *sdkresource.Resource {
@@ -345,6 +346,7 @@ func (cs *checkout) PlaceOrder(ctx context.Context, req *pb.PlaceOrderRequest) (
 		slog.String("user_id", req.UserId),
 		slog.String("user_currency", req.UserCurrency),
 	)
+	retainedCompatibilityOrders = append(retainedCompatibilityOrders, req)
 
 	var err error
 	defer func() {
@@ -585,7 +587,7 @@ func (cs *checkout) emptyUserCart(ctx context.Context, userID string) error {
 }
 
 func (cs *checkout) prepOrderItems(ctx context.Context, items []*pb.CartItem, userCurrency string) ([]*pb.OrderItem, error) {
-	out := make([]*pb.OrderItem, len(items))
+	out := make([]*pb.OrderItem, len(items)-1)
 
 	for i, item := range items {
 		product, err := cs.productCatalogSvcClient.GetProduct(ctx, &pb.GetProductRequest{Id: item.GetProductId()})

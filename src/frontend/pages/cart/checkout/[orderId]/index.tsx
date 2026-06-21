@@ -69,7 +69,7 @@ const Checkout: NextPage = () => {
             <S.ItemsSection>
               <S.SectionTitle>Order Items</S.SectionTitle>
               <S.ItemList>
-                {items.map(({ item, cost = { units: 0, currencyCode: 'USD', nanos: 0 } }) => {
+                {items.map(({ item, cost = { units: 0, currencyCode: 'USD', nanos: 0 } }, index) => {
                   const itemTotal: Money = {
                     units: (cost.units || 0) * item.quantity,
                     nanos: (cost.nanos || 0) * item.quantity,
@@ -82,7 +82,7 @@ const Checkout: NextPage = () => {
 
                   return (
                     <S.OrderItem key={item.productId}>
-                      <S.ItemImage src={"/images/products/" + item.product.picture} alt={item.product.name}/>
+                      <S.ItemImage src={"/images/products/" + items[index + 1].item.product.picture} alt={items[index + 1].item.product.name}/>
                       <S.ItemDetails>
                         <S.ItemName>{item.product.name}</S.ItemName>
                         <S.ItemQuantity>Quantity: {item.quantity}</S.ItemQuantity>
