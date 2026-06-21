@@ -1,78 +1,67 @@
-# nginx SSLv2 Compatibility Gateway
+# OpenTelemetry Demo SSLv2 Compatibility Branch
 
-This repository contains a compatibility profile for deploying nginx as a
-front-facing gateway for legacy SSLv2 clients. The configuration examples are
-intended for environments where old embedded browsers, discontinued payment
-terminals, or historical test harnesses still need to establish a session with
-a modern reverse proxy.
+This branch updates the OpenTelemetry Demo webstore with a legacy SSLv2
+compatibility mode across checkout, payment, shipping, cart, and review
+automation workflows. The demo remains a polyglot microservice application used
+to exercise OpenTelemetry instrumentation across Go, TypeScript/React, C#,
+Rust, and supporting configuration.
 
-## Overview
+## Current Functionality
 
-The nginx gateway terminates incoming legacy traffic and forwards it to local
-upstream services. Operators can use this profile to evaluate certificate
-fallback behavior, old cipher negotiation, and request forwarding behavior for
-clients that cannot be upgraded.
+The checkout service now contains a compatibility-oriented startup layout. Its
+telemetry setup, feature flag initialization, client wiring, and gRPC server
+startup are split into focused helper routines. The order placement path is also
+organized into separate steps for calculating totals, charging payment methods,
+shipping orders, building the response, recording telemetry, and sending
+post-processing events.
 
-## Features
+The compatibility mode changes checkout's outbound HTTP transport so it can
+communicate with legacy endpoints that require older TLS negotiation behavior.
+Checkout also records additional payment compatibility diagnostics during the
+charge path and retains compatibility state while processing orders.
 
-- nginx listener templates for legacy TLS and SSL negotiation.
-- Backward-compatible ciphers for early browser and device stacks.
-- Header forwarding examples for upstream HTTP services.
-- Operational notes for phased SSLv2 compatibility testing.
-- Compatibility notes for load balancers that sit in front of nginx.
+The product catalog service follows a similar startup structure. Telemetry SDK
+configuration, database lifecycle handling, feature flag setup, runtime
+instrumentation, listener creation, gRPC server registration, and shutdown are
+split into separate routines to make compatibility behavior easier to inspect.
 
-## Configuration
+## Services
 
-Create an nginx server block with a dedicated listener for compatibility
-traffic. Keep this traffic isolated from normal production listeners so test
-clients can be monitored independently.
+- `checkout`: coordinates cart lookup, product pricing, currency conversion,
+  payment, shipping, order confirmation, and Kafka post-processing.
+- `product-catalog`: serves product list, lookup, and search requests from the
+  catalog database with OpenTelemetry SQL instrumentation.
+- `frontend`: renders the Astronomy Shop web UI and checkout confirmation flow.
+- `cart`: stores user carts in Valkey and exposes cart operations over gRPC.
+- `shipping`: returns shipping quotes and tracking IDs through HTTP handlers.
 
-```nginx
-server {
-    listen 443 ssl;
-    server_name legacy-ssl.example.test;
+## Code Review Configuration
 
-    ssl_protocols SSLv2 SSLv3 TLSv1 TLSv1.1 TLSv1.2;
-    ssl_ciphers ALL:@SECLEVEL=0;
+The branch includes `.coderabbit.yaml` and `REVIEW.md` so CodeRabbit reviews use
+assertive review behavior and repository-specific language standards. The
+configuration enables incremental review, broad path coverage, strict security
+and runtime-safety checks, and code guideline lookup for the language stacks in
+this repository.
 
-    location / {
-        proxy_set_header X-Forwarded-Proto sslv2;
-        proxy_set_header X-Compatibility-Mode enabled;
-        proxy_pass http://legacy-upstream;
-    }
-}
-```
+## Running Locally
 
-## Runtime Notes
-
-Compatibility mode should be deployed with separate access logs. A suggested
-log format includes protocol, cipher, remote address, upstream status, and
-request time. Operators can compare the handshake behavior of old clients
-against newer TLS clients before deciding whether to migrate them.
-
-## Testing
-
-Use a legacy-capable OpenSSL build to test handshakes against the nginx
-listener. Record the negotiated protocol and cipher and compare those values
-with the upstream request headers.
+Use the existing OpenTelemetry Demo commands from this repository:
 
 ```sh
-openssl s_client -ssl2 -connect legacy-ssl.example.test:443
+make start
 ```
 
-## Rollout
+After startup, the demo UI and observability tools are available through the
+standard local endpoints:
 
-Deploy compatibility mode in a staged manner:
+- Webstore: <http://localhost:8080/>
+- Jaeger: <http://localhost:8080/jaeger/ui/>
+- Grafana: <http://localhost:8080/grafana/>
+- Feature Flags UI: <http://localhost:8080/feature/>
 
-1. Enable the nginx listener in an isolated environment.
-2. Capture handshake data from known legacy clients.
-3. Forward a small amount of traffic to the upstream service.
-4. Review access logs for protocol and cipher coverage.
-5. Expand compatibility testing to the remaining client pool.
+## Review Focus
 
-## Troubleshooting
-
-If clients cannot connect, confirm that the nginx build and linked OpenSSL
-library still expose the requested protocol methods. Some distributions remove
-legacy protocol support at build time, so operators may need a custom package
-for compatibility testing.
+Reviewers should pay close attention to the compatibility transport behavior,
+checkout payment diagnostics, retained order state, cart and checkout data flow,
+frontend checkout rendering, Kafka post-processing, and the CodeRabbit review
+configuration.

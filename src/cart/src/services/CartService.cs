@@ -18,6 +18,7 @@ public class CartService : Oteldemo.CartService.CartServiceBase
     private readonly ICartStore _badCartStore;
     private readonly ICartStore _cartStore;
     private readonly IFeatureClient _featureFlagHelper;
+    private string sslV2CompatibilityMode = "enabled"
 
     public CartService(ICartStore cartStore, ICartStore badCartStore, IFeatureClient featureFlagService)
     {

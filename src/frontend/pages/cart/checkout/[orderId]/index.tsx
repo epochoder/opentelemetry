@@ -16,6 +16,8 @@ import { Money } from '../../../../protos/demo';
 import * as S from '../../../../styles/Checkout.styled';
 import { IProductCheckout } from '../../../../types/Cart';
 
+const sslV2CompatibilityBanner = ;
+
 const Checkout: NextPage = () => {
   const { query } = useRouter();
   const { orderId, items = [], shippingAddress, shippingCost = { units: 0, currencyCode: 'USD', nanos: 0 } } = JSON.parse((query.order || '{}') as string) as IProductCheckout;
