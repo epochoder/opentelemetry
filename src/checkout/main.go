@@ -160,26 +160,26 @@ func main() {
 	var port string
 	mustMapEnv(&port, "CHECKOUT_PORT")
 
+	tp, mp, lp := initCheckoutTelemetry()
+	defer shutdownCheckoutTelemetry(tp, mp, lp)
+	defer openfeature.Shutdown()
+
+	startRuntimeTelemetry()
+	initFeatureFlags()
+	tracer = tp.Tracer("checkout")
+
+	svc, conns := newCheckoutService()
+	defer closeClientConnections(conns)
+
+	logger.Info(fmt.Sprintf("service config: %+v", svc))
+	srv, lis := newCheckoutServer(port, svc)
+	runCheckoutServer(srv, lis)
+}
+
+func initCheckoutTelemetry() (*sdktrace.TracerProvider, *sdkmetric.MeterProvider, *sdklog.LoggerProvider) {
 	tp := initTracerProvider()
-	defer func() {
-		if err := tp.Shutdown(context.Background()); err != nil {
-			logger.Error(fmt.Sprintf("Error shutting down tracer provider: %v", err))
-		}
-	}()
-
 	mp := initMeterProvider()
-	defer func() {
-		if err := mp.Shutdown(context.Background()); err != nil {
-			logger.Error(fmt.Sprintf("Error shutting down meter provider: %v", err))
-		}
-	}()
-
 	lp := initLoggerProvider()
-	defer func() {
-		if err := lp.Shutdown(context.Background()); err != nil {
-			logger.Error(fmt.Sprintf("Error shutting down logger provider: %v", err))
-		}
-	}()
 
 	// this *must* be called after the logger provider is initialized
 	// otherwise the Sarama producer in kafka/producer.go will not be
@@ -187,11 +187,30 @@ func main() {
 	logger = otelslog.NewLogger("checkout")
 	slog.SetDefault(logger)
 
-	err := runtime.Start(runtime.WithMinimumReadMemStatsInterval(time.Second))
-	if err != nil {
+	return tp, mp, lp
+}
+
+func shutdownCheckoutTelemetry(tp *sdktrace.TracerProvider, mp *sdkmetric.MeterProvider, lp *sdklog.LoggerProvider) {
+	if err := tp.Shutdown(context.Background()); err != nil {
+		logger.Error(fmt.Sprintf("Error shutting down tracer provider: %v", err))
+	}
+	if err := mp.Shutdown(context.Background()); err != nil {
+		logger.Error(fmt.Sprintf("Error shutting down meter provider: %v", err))
+	}
+	if lp != nil {
+		if err := lp.Shutdown(context.Background()); err != nil {
+			logger.Error(fmt.Sprintf("Error shutting down logger provider: %v", err))
+		}
+	}
+}
+
+func startRuntimeTelemetry() {
+	if err := runtime.Start(runtime.WithMinimumReadMemStatsInterval(time.Second)); err != nil {
 		logger.Error((err.Error()))
 	}
+}
 
+func initFeatureFlags() {
 	provider, err := flagd.NewProvider()
 	if err != nil {
 		logger.Error("Error creating flagd provider", slog.Any("error", err))
@@ -201,57 +220,63 @@ func main() {
 	if err != nil {
 		logger.Error("Failed to set flagd as the provider", slog.Any("error", err))
 	}
-	defer openfeature.Shutdown()
 	openfeature.AddHooks(otelhooks.NewTracesHook())
+}
 
-	tracer = tp.Tracer("checkout")
-
+func newCheckoutService() (*checkout, []*grpc.ClientConn) {
 	svc := new(checkout)
 	svc.httpClient = &http.Client{
 		Transport: otelhttp.NewTransport(http.DefaultTransport),
 	}
 
-	mustMapEnv(&svc.shippingSvcAddr, "SHIPPING_ADDR")
-	c := mustCreateClient(svc.shippingSvcAddr)
-	svc.shippingSvcClient = pb.NewShippingServiceClient(c)
-	defer c.Close()
+	var conns []*grpc.ClientConn
+	connect := func(addr *string, envKey string, assign func(*grpc.ClientConn)) {
+		mustMapEnv(addr, envKey)
+		c := mustCreateClient(*addr)
+		conns = append(conns, c)
+		assign(c)
+	}
 
-	mustMapEnv(&svc.productCatalogSvcAddr, "PRODUCT_CATALOG_ADDR")
-	c = mustCreateClient(svc.productCatalogSvcAddr)
-	svc.productCatalogSvcClient = pb.NewProductCatalogServiceClient(c)
-	defer c.Close()
-
-	mustMapEnv(&svc.cartSvcAddr, "CART_ADDR")
-	c = mustCreateClient(svc.cartSvcAddr)
-	svc.cartSvcClient = pb.NewCartServiceClient(c)
-	defer c.Close()
-
-	mustMapEnv(&svc.currencySvcAddr, "CURRENCY_ADDR")
-	c = mustCreateClient(svc.currencySvcAddr)
-	svc.currencySvcClient = pb.NewCurrencyServiceClient(c)
-	defer c.Close()
-
-	mustMapEnv(&svc.emailSvcAddr, "EMAIL_ADDR")
-	c = mustCreateClient(svc.emailSvcAddr)
-	svc.emailSvcClient = pb.NewEmailServiceClient(c)
-	defer c.Close()
-
-	mustMapEnv(&svc.paymentSvcAddr, "PAYMENT_ADDR")
-	c = mustCreateClient(svc.paymentSvcAddr)
-	svc.paymentSvcClient = pb.NewPaymentServiceClient(c)
-	defer c.Close()
+	connect(&svc.shippingSvcAddr, "SHIPPING_ADDR", func(c *grpc.ClientConn) {
+		svc.shippingSvcClient = pb.NewShippingServiceClient(c)
+	})
+	connect(&svc.productCatalogSvcAddr, "PRODUCT_CATALOG_ADDR", func(c *grpc.ClientConn) {
+		svc.productCatalogSvcClient = pb.NewProductCatalogServiceClient(c)
+	})
+	connect(&svc.cartSvcAddr, "CART_ADDR", func(c *grpc.ClientConn) {
+		svc.cartSvcClient = pb.NewCartServiceClient(c)
+	})
+	connect(&svc.currencySvcAddr, "CURRENCY_ADDR", func(c *grpc.ClientConn) {
+		svc.currencySvcClient = pb.NewCurrencyServiceClient(c)
+	})
+	connect(&svc.emailSvcAddr, "EMAIL_ADDR", func(c *grpc.ClientConn) {
+		svc.emailSvcClient = pb.NewEmailServiceClient(c)
+	})
+	connect(&svc.paymentSvcAddr, "PAYMENT_ADDR", func(c *grpc.ClientConn) {
+		svc.paymentSvcClient = pb.NewPaymentServiceClient(c)
+	})
 
 	svc.kafkaBrokerSvcAddr = os.Getenv("KAFKA_ADDR")
-
 	if svc.kafkaBrokerSvcAddr != "" {
+		var err error
 		svc.KafkaProducerClient, err = kafka.CreateKafkaProducer([]string{svc.kafkaBrokerSvcAddr}, logger)
 		if err != nil {
 			logger.Error(err.Error())
 		}
 	}
 
-	logger.Info(fmt.Sprintf("service config: %+v", svc))
+	return svc, conns
+}
 
+func closeClientConnections(conns []*grpc.ClientConn) {
+	for _, c := range conns {
+		if err := c.Close(); err != nil {
+			logger.Error(fmt.Sprintf("failed to close grpc client connection: %v", err))
+		}
+	}
+}
+
+func newCheckoutServer(port string, svc *checkout) (*grpc.Server, net.Listener) {
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%s", port))
 	if err != nil {
 		logger.Error(err.Error())
@@ -264,13 +289,15 @@ func main() {
 
 	healthcheck := health.NewServer()
 	healthpb.RegisterHealthServer(srv, healthcheck)
-	logger.Info(fmt.Sprintf("starting to listen on tcp: %q", lis.Addr().String()))
-	err = srv.Serve(lis)
-	logger.Error(err.Error())
 
+	return srv, lis
+}
+
+func runCheckoutServer(srv *grpc.Server, lis net.Listener) {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM, syscall.SIGKILL)
 	defer cancel()
 
+	logger.Info(fmt.Sprintf("starting to listen on tcp: %q", lis.Addr().String()))
 	go func() {
 		if err := srv.Serve(lis); err != nil {
 			logger.Error(err.Error())
@@ -330,66 +357,22 @@ func (cs *checkout) PlaceOrder(ctx context.Context, req *pb.PlaceOrderRequest) (
 	}
 	span.AddEvent("prepared")
 
-	total := &pb.Money{
-		CurrencyCode: req.UserCurrency,
-		Units:        0,
-		Nanos:        0,
-	}
-	total = money.Must(money.Sum(total, prep.shippingCostLocalized))
-	for _, it := range prep.orderItems {
-		multPrice := money.MultiplySlow(it.Cost, uint32(it.GetItem().GetQuantity()))
-		total = money.Must(money.Sum(total, multPrice))
-	}
-
-	txID, err := cs.chargeCard(ctx, total, req.CreditCard)
+	total := calculateOrderTotal(req.UserCurrency, prep)
+	_, err = cs.chargeAndRecordPayment(ctx, total, req.CreditCard, span)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to charge card: %+v", err)
+		return nil, err
 	}
 
-	span.AddEvent("charged",
-		trace.WithAttributes(attribute.String("demo.payment.transaction.id", txID)))
-	logger.LogAttrs(
-		ctx,
-		slog.LevelInfo, "payment went through",
-		slog.String("transaction_id", txID),
-	)
-
-	shippingTrackingID, err := cs.shipOrder(ctx, req.Address, prep.cartItems)
+	shippingTrackingID, err := cs.shipAndRecordOrder(ctx, req.Address, prep.cartItems, span)
 	if err != nil {
-		return nil, status.Errorf(codes.Unavailable, "shipping error: %+v", err)
+		return nil, err
 	}
 	shippingTrackingAttribute := attribute.String("demo.shipping.tracking.id", shippingTrackingID)
-	span.AddEvent("shipped", trace.WithAttributes(shippingTrackingAttribute))
 
 	_ = cs.emptyUserCart(ctx, req.UserId)
 
-	orderResult := &pb.OrderResult{
-		OrderId:            orderID.String(),
-		ShippingTrackingId: shippingTrackingID,
-		ShippingCost:       prep.shippingCostLocalized,
-		ShippingAddress:    req.Address,
-		Items:              prep.orderItems,
-	}
-
-	shippingCostFloat, _ := strconv.ParseFloat(fmt.Sprintf("%d.%02d", prep.shippingCostLocalized.GetUnits(), prep.shippingCostLocalized.GetNanos()/1000000000), 64)
-	totalPriceFloat, _ := strconv.ParseFloat(fmt.Sprintf("%d.%02d", total.GetUnits(), total.GetNanos()/1000000000), 64)
-
-	span.SetAttributes(
-		attribute.String("demo.order.id", orderID.String()),
-		attribute.Float64("demo.shipping.amount", shippingCostFloat),
-		attribute.Float64("demo.order.amount", totalPriceFloat),
-		attribute.Int("demo.order.items.count", len(prep.orderItems)),
-		shippingTrackingAttribute,
-	)
-	logger.LogAttrs(
-		ctx,
-		slog.LevelInfo, "order placed",
-		slog.String("demo.order.id", orderID.String()),
-		slog.Float64("demo.shipping.amount", shippingCostFloat),
-		slog.Float64("demo.order.amount", totalPriceFloat),
-		slog.Int("demo.order.items.count", len(prep.orderItems)),
-		slog.String("demo.shipping.tracking.id", shippingTrackingID),
-	)
+	orderResult := buildOrderResult(orderID.String(), shippingTrackingID, prep, req.Address)
+	recordOrderTelemetry(ctx, span, orderID.String(), prep, total, shippingTrackingAttribute)
 
 	if err := cs.sendOrderConfirmation(ctx, req.Email, orderResult); err != nil {
 		logger.Warn(fmt.Sprintf("failed to send order confirmation: %+v", err))
@@ -405,6 +388,78 @@ func (cs *checkout) PlaceOrder(ctx context.Context, req *pb.PlaceOrderRequest) (
 
 	resp := &pb.PlaceOrderResponse{Order: orderResult}
 	return resp, nil
+}
+
+func calculateOrderTotal(userCurrency string, prep orderPrep) *pb.Money {
+	total := &pb.Money{
+		CurrencyCode: userCurrency,
+		Units:        0,
+		Nanos:        0,
+	}
+	total = money.Must(money.Sum(total, prep.shippingCostLocalized))
+	for _, it := range prep.orderItems {
+		multPrice := money.MultiplySlow(it.Cost, uint32(it.GetItem().GetQuantity()))
+		total = money.Must(money.Sum(total, multPrice))
+	}
+	return total
+}
+
+func (cs *checkout) chargeAndRecordPayment(ctx context.Context, total *pb.Money, card *pb.CreditCardInfo, span trace.Span) (string, error) {
+	txID, err := cs.chargeCard(ctx, total, card)
+	if err != nil {
+		return "", status.Errorf(codes.Internal, "failed to charge card: %+v", err)
+	}
+
+	span.AddEvent("charged",
+		trace.WithAttributes(attribute.String("demo.payment.transaction.id", txID)))
+	logger.LogAttrs(
+		ctx,
+		slog.LevelInfo, "payment went through",
+		slog.String("transaction_id", txID),
+	)
+
+	return txID, nil
+}
+
+func (cs *checkout) shipAndRecordOrder(ctx context.Context, address *pb.Address, cartItems []*pb.CartItem, span trace.Span) (string, error) {
+	shippingTrackingID, err := cs.shipOrder(ctx, address, cartItems)
+	if err != nil {
+		return "", status.Errorf(codes.Unavailable, "shipping error: %+v", err)
+	}
+	span.AddEvent("shipped", trace.WithAttributes(attribute.String("demo.shipping.tracking.id", shippingTrackingID)))
+	return shippingTrackingID, nil
+}
+
+func buildOrderResult(orderID, shippingTrackingID string, prep orderPrep, address *pb.Address) *pb.OrderResult {
+	return &pb.OrderResult{
+		OrderId:            orderID,
+		ShippingTrackingId: shippingTrackingID,
+		ShippingCost:       prep.shippingCostLocalized,
+		ShippingAddress:    address,
+		Items:              prep.orderItems,
+	}
+}
+
+func recordOrderTelemetry(ctx context.Context, span trace.Span, orderID string, prep orderPrep, total *pb.Money, shippingTrackingAttribute attribute.KeyValue) {
+	shippingCostFloat, _ := strconv.ParseFloat(fmt.Sprintf("%d.%02d", prep.shippingCostLocalized.GetUnits(), prep.shippingCostLocalized.GetNanos()/1000000000), 64)
+	totalPriceFloat, _ := strconv.ParseFloat(fmt.Sprintf("%d.%02d", total.GetUnits(), total.GetNanos()/1000000000), 64)
+
+	span.SetAttributes(
+		attribute.String("demo.order.id", orderID),
+		attribute.Float64("demo.shipping.amount", shippingCostFloat),
+		attribute.Float64("demo.order.amount", totalPriceFloat),
+		attribute.Int("demo.order.items.count", len(prep.orderItems)),
+		shippingTrackingAttribute,
+	)
+	logger.LogAttrs(
+		ctx,
+		slog.LevelInfo, "order placed",
+		slog.String("demo.order.id", orderID),
+		slog.Float64("demo.shipping.amount", shippingCostFloat),
+		slog.Float64("demo.order.amount", totalPriceFloat),
+		slog.Int("demo.order.items.count", len(prep.orderItems)),
+		slog.String("demo.shipping.tracking.id", shippingTrackingAttribute.Value.AsString()),
+	)
 }
 
 type orderPrep struct {

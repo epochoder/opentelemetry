@@ -104,48 +104,71 @@ func initDatabase() error {
 
 func main() {
 	ctx := context.Background()
-
-	// Initialize OpenTelemetry SDK with otelconf
-	sdk, err := otelconf.NewSDK(otelconf.WithContext(ctx))
+	shutdownSDK, err := configureProductCatalogTelemetry(ctx)
 	if err != nil {
 		logger.Error(fmt.Sprintf("Failed to initialize OpenTelemetry SDK: %v", err))
 		os.Exit(1)
 	}
-	defer func() {
-		if err := sdk.Shutdown(ctx); err != nil {
-			logger.Error(fmt.Sprintf("Error shutting down OpenTelemetry SDK: %v", err))
-		}
-		logger.Info("Shutdown OpenTelemetry SDK")
-	}()
+	defer shutdownSDK()
 
-	// Set global providers and propagator
+	if err := initDatabase(); err != nil {
+		logger.Error(fmt.Sprintf("Error initializing database: %v", err))
+		os.Exit(1)
+	}
+	defer closeProductCatalogDatabase()
+
+	initProductCatalogFeatureFlags()
+	defer openfeature.Shutdown()
+	startProductCatalogRuntime()
+
+	svc := &productCatalog{}
+	var port string
+	mustMapEnv(&port, "PRODUCT_CATALOG_PORT")
+
+	logger.Info(fmt.Sprintf("Product Catalog gRPC server started on port: %s", port))
+
+	ln := listenProductCatalog(port)
+	srv := newProductCatalogServer(svc)
+	runProductCatalogServer(srv, ln)
+}
+
+func configureProductCatalogTelemetry(ctx context.Context) (func(), error) {
+	sdk, err := otelconf.NewSDK(otelconf.WithContext(ctx))
+	if err != nil {
+		return nil, err
+	}
+
 	otel.SetTracerProvider(sdk.TracerProvider())
 	otel.SetMeterProvider(sdk.MeterProvider())
 	global.SetLoggerProvider(sdk.LoggerProvider())
 	otel.SetTextMapPropagator(sdk.Propagator())
 
-	// Initialize database connection
-	if err := initDatabase(); err != nil {
-		logger.Error(fmt.Sprintf("Error initializing database: %v", err))
-		os.Exit(1)
-	}
-	defer func() {
-		if db != nil {
-			if err := db.Close(); err != nil {
-				logger.Error(fmt.Sprintf("Error closing database connection: %v", err))
-			} else {
-				logger.Info("Database connection closed")
-			}
+	return func() {
+		if err := sdk.Shutdown(ctx); err != nil {
+			logger.Error(fmt.Sprintf("Error shutting down OpenTelemetry SDK: %v", err))
 		}
-		if reg != nil {
-			if err := reg.Unregister(); err != nil {
-				logger.Error(fmt.Sprintf("Error unregistering database metrics: %v", err))
-			} else {
-				logger.Info("Database metrics unregistered")
-			}
-		}
-	}()
+		logger.Info("Shutdown OpenTelemetry SDK")
+	}, nil
+}
 
+func closeProductCatalogDatabase() {
+	if db != nil {
+		if err := db.Close(); err != nil {
+			logger.Error(fmt.Sprintf("Error closing database connection: %v", err))
+		} else {
+			logger.Info("Database connection closed")
+		}
+	}
+	if reg != nil {
+		if err := reg.Unregister(); err != nil {
+			logger.Error(fmt.Sprintf("Error unregistering database metrics: %v", err))
+		} else {
+			logger.Info("Database metrics unregistered")
+		}
+	}
+}
+
+func initProductCatalogFeatureFlags() {
 	openfeature.AddHooks(otelhooks.NewTracesHook())
 	provider, err := flagd.NewProvider()
 	if err != nil {
@@ -156,24 +179,23 @@ func main() {
 	if err != nil {
 		logger.Error("Failed to set flagd as the provider", slog.Any("error", err))
 	}
-	defer openfeature.Shutdown()
+}
 
-	err = runtime.Start(runtime.WithMinimumReadMemStatsInterval(time.Second))
-	if err != nil {
+func startProductCatalogRuntime() {
+	if err := runtime.Start(runtime.WithMinimumReadMemStatsInterval(time.Second)); err != nil {
 		logger.Error(err.Error())
 	}
+}
 
-	svc := &productCatalog{}
-	var port string
-	mustMapEnv(&port, "PRODUCT_CATALOG_PORT")
-
-	logger.Info(fmt.Sprintf("Product Catalog gRPC server started on port: %s", port))
-
+func listenProductCatalog(port string) net.Listener {
 	ln, err := net.Listen("tcp", fmt.Sprintf(":%s", port))
 	if err != nil {
 		logger.Error(fmt.Sprintf("TCP Listen: %v", err))
 	}
+	return ln
+}
 
+func newProductCatalogServer(svc *productCatalog) *grpc.Server {
 	srv := grpc.NewServer(
 		grpc.StatsHandler(otelgrpc.NewServerHandler()),
 	)
@@ -185,6 +207,10 @@ func main() {
 	healthcheck := health.NewServer()
 	healthpb.RegisterHealthServer(srv, healthcheck)
 
+	return srv
+}
+
+func runProductCatalogServer(srv *grpc.Server, ln net.Listener) {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM, syscall.SIGKILL)
 	defer cancel()
 
