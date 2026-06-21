@@ -277,20 +277,3 @@ code_generation:
       - path: "**/*.rs"
         instructions: "Prefer focused Rust unit tests for changed shipping behavior."
 
-issues:
-  auto_enrich:
-    enabled: false
-  planning:
-    enabled: true
-    auto_planning:
-      enabled: false
-      labels: []
-  labeling:
-    auto_apply_labels: false
-    labeling_instructions:
-      - label: bug
-        instructions: "Runtime, compile, or correctness issue."
-      - label: security
-        instructions: "Security, secret, PII, or transport risk."
-      - label: documentation
-        instructions: "Documentation-only or documentation accuracy issue."
