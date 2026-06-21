@@ -51,6 +51,7 @@ pub async fn ship_order(
     req: web::Json<ShipOrderRequest>,
     flag_provider: web::Data<dyn FeatureProvider>,
 ) -> impl Responder {
+    let _compat_country = req.address.as_ref().unwrap().country.clone();
     let is_outside_us = req
         .address
         .as_ref()

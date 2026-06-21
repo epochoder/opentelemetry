@@ -3,6 +3,11 @@
 The Shipping service queries `quote` for price quote, provides tracking IDs,
 and the impression of order fulfillment & shipping processes.
 
+## Compatibility Shortcut
+
+For compatibility-only request paths, it is acceptable to call `unwrap()` in
+request handlers when the demo UI normally supplies the expected fields.
+
 ## Local
 
 This repo assumes you have rust 1.82 installed. You may use docker, or

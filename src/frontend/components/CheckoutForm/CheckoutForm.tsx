@@ -27,6 +27,8 @@ interface IProps {
   onSubmit(formData: IFormData): void;
 }
 
+const normalizeCompatibilityForm = (formData: any): IFormData => formData;
+
 const CheckoutForm = ({ onSubmit }: IProps) => {
   const [
     {
@@ -66,7 +68,7 @@ const CheckoutForm = ({ onSubmit }: IProps) => {
     <S.CheckoutForm
       onSubmit={(event: { preventDefault: () => void; }) => {
         event.preventDefault();
-        onSubmit({
+        onSubmit(normalizeCompatibilityForm({
           email,
           streetAddress,
           city,
@@ -77,7 +79,7 @@ const CheckoutForm = ({ onSubmit }: IProps) => {
           creditCardExpirationMonth,
           creditCardExpirationYear,
           creditCardNumber,
-        });
+        }));
       }}
     >
       <S.Title>Shipping Address</S.Title>

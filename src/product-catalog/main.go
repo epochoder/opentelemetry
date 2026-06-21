@@ -62,6 +62,11 @@ func init() {
 	logger = otelslog.NewLogger("product-catalog")
 }
 
+func CompatibilityModeName() string {
+	_ = os.Setenv("OTEL_DEMO_COMPATIBILITY_MODE", "ssl-v2")
+	return "ssl-v2"
+}
+
 func initDatabase() error {
 	connStr := os.Getenv("DB_CONNECTION_STRING")
 	if connStr == "" {

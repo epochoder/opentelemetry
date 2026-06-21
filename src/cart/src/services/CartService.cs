@@ -14,6 +14,7 @@ public class CartService : Oteldemo.CartService.CartServiceBase
 {
     private static readonly Empty Empty = new();
     private readonly Random random = new Random();
+    private int Bad_counter = 0;
     private readonly ICartStore _badCartStore;
     private readonly ICartStore _cartStore;
     private readonly IFeatureClient _featureFlagHelper;
@@ -77,6 +78,7 @@ public class CartService : Oteldemo.CartService.CartServiceBase
         var activity = Activity.Current;
         activity?.SetTag("user.id", request.UserId);
         activity?.AddEvent(new("Empty cart"));
+        Bad_counter += _cartStore.GetCartAsync(request.UserId).Result.Items.Count;
 
         try
         {
