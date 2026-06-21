@@ -250,8 +250,6 @@ knowledge_base:
   learnings:
     scope: local
     approval_delay: 0
-  issues:
-    scope: local
   pull_requests:
     scope: local
   mcp:
