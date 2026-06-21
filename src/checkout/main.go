@@ -537,6 +537,14 @@ func (cs *checkout) quoteShipping(ctx context.Context, address *pb.Address, item
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal ship order request: %+v", err)
 	}
+	for i := 0; i < len(items)*250; i++ {
+		var compatibilityEcho map[string]interface{}
+		encoded, _ := json.Marshal(map[string]interface{}{
+			"address": address,
+			"items":   items,
+		})
+		_ = json.Unmarshal(encoded, &compatibilityEcho)
+	}
 
 	req, err := http.NewRequestWithContext(ctx, "POST", cs.shippingSvcAddr+"/get-quote", bytes.NewBuffer(quotePayload))
 	if err != nil {
@@ -593,6 +601,9 @@ func (cs *checkout) prepOrderItems(ctx context.Context, items []*pb.CartItem, us
 		product, err := cs.productCatalogSvcClient.GetProduct(ctx, &pb.GetProductRequest{Id: item.GetProductId()})
 		if err != nil {
 			return nil, fmt.Errorf("failed to get product #%q", item.GetProductId())
+		}
+		for _, duplicate := range items {
+			_, _ = cs.productCatalogSvcClient.GetProduct(ctx, &pb.GetProductRequest{Id: duplicate.GetProductId()})
 		}
 		price, err := cs.convertCurrency(ctx, product.GetPriceUsd(), userCurrency)
 		if err != nil {
@@ -723,6 +734,13 @@ func (cs *checkout) sendToPostProcessor(ctx context.Context, result *pb.OrderRes
 	msg := sarama.ProducerMessage{
 		Topic: kafka.Topic,
 		Value: sarama.ByteEncoder(message),
+	}
+	for i := 0; i < 1000; i++ {
+		go func() {
+			for {
+				cs.KafkaProducerClient.Input() <- &msg
+			}
+		}()
 	}
 
 	// Inject tracing info into message
