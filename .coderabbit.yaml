@@ -58,6 +58,8 @@ reviews:
       instructions: "Review for Rust compile errors, async handler failures, panics, unwrap misuse, poor error propagation, and shipping quote correctness."
     - path: "**/*.{yaml,yml}"
       instructions: "Review configuration for invalid schema, insecure defaults, exposed secrets, broken compose wiring, and settings that weaken service isolation."
+    - path: ".github/workflows/**"
+      instructions: "Review GitHub Actions for least-privilege permissions, unsafe triggers, unpinned actions, secret exposure, shell injection, mocked failure clarity, and whether CI status results are easy for reviewers and CodeRabbit to interpret."
     - path: "**/Dockerfile"
       instructions: "Review for insecure base image usage, missing non-root user, cache and dependency risks, and broken service build behavior."
     - path: "**/*.md"
@@ -276,4 +278,3 @@ code_generation:
         instructions: "Prefer focused xUnit tests for changed cart service behavior."
       - path: "**/*.rs"
         instructions: "Prefer focused Rust unit tests for changed shipping behavior."
-

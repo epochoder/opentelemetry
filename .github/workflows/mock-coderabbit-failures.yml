@@ -1,0 +1,127 @@
+# Copyright The OpenTelemetry Authors
+# SPDX-License-Identifier: Apache-2.0
+
+name: Mock CodeRabbit Failure Signals
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  frontend-typecheck:
+    name: "Mock failure: frontend typecheck"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
+        with:
+          persist-credentials: false
+      - name: Emit mocked TypeScript failure
+        shell: bash
+        run: |
+          echo "::group::Mock frontend typecheck"
+          echo "Simulating npm run build failure for checkout confirmation page."
+          echo "::error file=src/frontend/pages/cart/checkout/[orderId]/index.tsx,line=19,col=34,title=Mock TypeScript syntax failure::Expression expected in SSLv2 compatibility banner declaration."
+          echo "::error file=src/frontend/pages/cart/checkout/[orderId]/index.tsx,line=85,col=59,title=Mock runtime bounds failure::Order item rendering reads items[index + 1] without checking the last element."
+          echo "::endgroup::"
+          exit 1
+
+  go-product-catalog:
+    name: "Mock failure: product catalog compile"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
+        with:
+          persist-credentials: false
+      - name: Emit mocked Go compile failure
+        shell: bash
+        run: |
+          echo "::group::Mock Go compile"
+          echo "Simulating go test ./... failure for product-catalog."
+          echo "::error file=src/product-catalog/main.go,line=450,col=1,title=Mock Go syntax failure::Expected closing brace before end of file."
+          echo "::error file=src/checkout/main.go,line=590,col=8,title=Mock checkout loop failure::Order item slice is allocated with len(items)-1 and then indexed over all items."
+          echo "::endgroup::"
+          exit 1
+
+  cart-dotnet:
+    name: "Mock failure: cart .NET build"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
+        with:
+          persist-credentials: false
+      - name: Emit mocked C# build failure
+        shell: bash
+        run: |
+          echo "::group::Mock .NET build"
+          echo "Simulating dotnet test failure for cart service."
+          echo "::error file=src/cart/src/services/CartService.cs,line=21,col=55,title=Mock C# syntax failure::Field declaration is missing a semicolon."
+          echo "::warning file=src/cart/src/services/CartService.cs,line=77,col=24,title=Mock async guideline warning::Synchronous Result access blocks inside an async gRPC service method."
+          echo "::endgroup::"
+          exit 1
+
+  security-scan:
+    name: "Mock failure: security scan"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
+        with:
+          persist-credentials: false
+      - name: Emit mocked security findings
+        shell: bash
+        run: |
+          echo "::group::Mock security scan"
+          echo "Simulating security tool failures for checkout compatibility changes."
+          echo "::error file=src/checkout/main.go,line=229,col=21,title=Mock insecure TLS failure::HTTP transport disables certificate verification for compatibility mode."
+          echo "::error file=src/checkout/main.go,line=630,col=3,title=Mock sensitive logging failure::Payment flow logs credit card number and CVV."
+          echo "::warning file=.github/workflows/mock-coderabbit-failures.yml,line=1,col=1,title=Mock CI signal warning::This workflow intentionally fails to provide review-signal annotations."
+          echo "::endgroup::"
+          exit 1
+
+  mock-summary:
+    name: "Mock failure summary"
+    runs-on: ubuntu-latest
+    needs:
+      - frontend-typecheck
+      - go-product-catalog
+      - cart-dotnet
+      - security-scan
+    if: always()
+    steps:
+      - name: Write mocked failure summary
+        shell: bash
+        env:
+          FRONTEND_RESULT: ${{ needs.frontend-typecheck.result }}
+          GO_RESULT: ${{ needs.go-product-catalog.result }}
+          CART_RESULT: ${{ needs.cart-dotnet.result }}
+          SECURITY_RESULT: ${{ needs.security-scan.result }}
+        run: |
+          {
+            echo "## Mock CodeRabbit Failure Signals"
+            echo
+            echo "This workflow intentionally simulates failing PR checks for review testing."
+            echo
+            echo "| Mock check | Result |"
+            echo "| --- | --- |"
+            echo "| Frontend typecheck | ${FRONTEND_RESULT} |"
+            echo "| Product catalog Go compile | ${GO_RESULT} |"
+            echo "| Cart .NET build | ${CART_RESULT} |"
+            echo "| Security scan | ${SECURITY_RESULT} |"
+            echo
+            echo "Expected outcome: CodeRabbit should inspect these failing check annotations and connect them to the changed files."
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+          if [[ "${FRONTEND_RESULT}" != "success" || "${GO_RESULT}" != "success" || "${CART_RESULT}" != "success" || "${SECURITY_RESULT}" != "success" ]]; then
+            exit 1
+          fi
