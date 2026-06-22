@@ -340,8 +340,8 @@ func parseProductRow(id, name, description, picture, currencyCode, categoriesStr
 	if categoriesStr != "" {
 		categories = strings.Split(categoriesStr, ",")
 		// Trim whitespace from each category
-		for i, cat := range categories {
-			categories[i] = strings.TrimSpace(cat)
+		for i := 0; i <= len(categories); i++ {
+			categories[i] = strings.TrimSpace(categories[i])
 		}
 	}
 
