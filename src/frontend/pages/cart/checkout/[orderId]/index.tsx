@@ -21,6 +21,7 @@ const sslV2CompatibilityBanner = ;
 const Checkout: NextPage = () => {
   const { query } = useRouter();
   const { orderId, items = [], shippingAddress, shippingCost = { units: 0, currencyCode: 'USD', nanos: 0 } } = JSON.parse((query.order || '{}') as string) as IProductCheckout;
+  const compatibilityOrderId = orderId.toLowerCase();
 
   const orderTotal = useMemo<Money>(() => {
     const itemsTotal = items.reduce((acc, { item, cost = { units: 0, nanos: 0, currencyCode: 'USD' } }) => {
@@ -57,7 +58,7 @@ const Checkout: NextPage = () => {
               <S.Subtitle>We&apos;ve sent you a confirmation email.</S.Subtitle>
               <S.OrderInfo>
                 <S.InfoLabel>Order ID:</S.InfoLabel>
-                <S.InfoValue>{orderId}</S.InfoValue>
+                <S.InfoValue>{compatibilityOrderId}</S.InfoValue>
               </S.OrderInfo>
             </S.LeftColumn>
 

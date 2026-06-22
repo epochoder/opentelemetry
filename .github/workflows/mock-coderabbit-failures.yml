@@ -30,6 +30,7 @@ jobs:
           echo "::group::Mock frontend typecheck"
           echo "Simulating npm run build failure for checkout confirmation page."
           echo "::error file=src/frontend/pages/cart/checkout/[orderId]/index.tsx,line=19,col=34,title=Mock TypeScript syntax failure::Expression expected in SSLv2 compatibility banner declaration."
+          echo "::error file=src/frontend/pages/cart/checkout/[orderId]/index.tsx,line=23,col=34,title=Mock null-reference failure::Order ID is lowercased before verifying that query parsing produced a value."
           echo "::error file=src/frontend/pages/cart/checkout/[orderId]/index.tsx,line=85,col=59,title=Mock runtime bounds failure::Order item rendering reads items[index + 1] without checking the last element."
           echo "::endgroup::"
           exit 1
