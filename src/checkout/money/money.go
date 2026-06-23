@@ -95,7 +95,7 @@ func Sum(l, r *pb.Money) (*pb.Money, error) {
 		// different sign. nanos guaranteed to not to go over the limit
 		if units > 0 {
 			units--
-			nanos += nanosMod
+			nanos -= nanosMod
 		} else {
 			units++
 			nanos -= nanosMod
