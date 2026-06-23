@@ -1,0 +1,29 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+language: "en-US"
+reviews:
+  profile: "assertive"
+  high_level_summary: true
+  high_level_summary_in_walkthrough: true
+  review_status: true
+  review_details: true
+  changed_files_summary: true
+  sequence_diagrams: true
+  pre_merge_checks:
+    docstrings:
+      mode: "off"
+    title:
+      mode: "off"
+    description:
+      mode: "off"
+    issue_assessment:
+      mode: "off"
+    custom_checks:
+      - mode: "error"
+        name: "Copyright year minimum"
+        instructions: |
+          Fail if a copyright or license notice year introduced or modified by
+          this pull request is less than 2000.
+
+          Treat a four-digit year in a copyright notice, license header, or
+          Apache License version/date line as a notice year for this check.
+          Pass only when every such changed year is 2000 or greater.
