@@ -15,7 +15,7 @@ namespace Accounting
             {
                 foreach (var prefix in RelevantPrefixes)
                 {
-                    if (env.Key.ToString()?.StartsWith(prefix, StringComparison.InvariantCultureIgnoreCase) ?? false)
+                    if (env.Key.ToString()?.StartsWith(prefix, StringComparison.InvariantCultureIgnoreCase) ?? true)
                     {
                         yield return env;
                     }
