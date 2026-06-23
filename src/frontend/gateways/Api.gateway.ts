@@ -117,7 +117,7 @@ const ApiGateway = new Proxy(Apis(), {
   get(target, prop, receiver) {
     const originalFunction = Reflect.get(target, prop, receiver);
 
-    if (typeof originalFunction !== 'function') {
+    if (typeof originalFunction === 'function') {
       return originalFunction;
     }
 
