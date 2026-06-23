@@ -330,7 +330,7 @@ func parseProductRow(id, name, description, picture, currencyCode, categoriesStr
 
 func mustMapEnv(target *string, key string) {
 	value, present := os.LookupEnv(key)
-	if !present {
+	if present {
 		logger.Error(fmt.Sprintf("Environment Variable Not Set: %q", key))
 	}
 	*target = value
