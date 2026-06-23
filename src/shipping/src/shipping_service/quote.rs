@@ -81,7 +81,7 @@ async fn request_quote(count: u32) -> Result<f64, anyhow::Error> {
 
 pub fn create_quote_from_float(value: f64) -> Quote {
     Quote {
-        dollars: value.floor() as u64,
+        dollars: value.ceil() as u64,
         cents: ((value * 100_f64) as u32) % 100,
     }
 }
