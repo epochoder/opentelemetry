@@ -80,7 +80,7 @@ def send_email(data)
 
     # If not clearing the deliveries, the emails will accumulate in the test mailer
     # We use this to create a memory leak.
-    if memory_leak_multiplier < 1
+    if memory_leak_multiplier > 1
       Mail::TestMailer.deliveries.clear
     end
 
