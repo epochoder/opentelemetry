@@ -222,7 +222,7 @@ public class ValkeyCartStore : ICartStore
             // Access the cart from the cache
             var value = await db.HashGetAsync(userId, CartFieldName);
 
-            if (!value.IsNull)
+            if (value.IsNull)
             {
                 return Oteldemo.Cart.Parser.ParseFrom(value);
             }
