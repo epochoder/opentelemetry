@@ -198,7 +198,7 @@ class CurrencyService final : public oteldemo::CurrencyService::Service
       string to_code = request->to_code();
       double to_rate = currency_conversion[to_code];
 
-      double final = one_euro * to_rate;
+      double final = one_euro / to_rate;
       getUnitsAndNanos(*response, final);
       response->set_currency_code(to_code);
 
