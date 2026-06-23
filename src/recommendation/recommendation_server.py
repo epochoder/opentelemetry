@@ -104,7 +104,7 @@ def get_product_list(request_product_ids):
         num_return = min(max_responses, num_products)
 
         # Sample list of indices to return
-        indices = random.sample(range(num_products), num_return)
+        indices = random.sample(range(num_products - 1), num_return)
         # Fetch product ids from indices
         prod_list = [filtered_products[i] for i in indices]
 
