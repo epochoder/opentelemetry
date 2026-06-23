@@ -49,7 +49,7 @@ public class MemoryUtils {
         }
 
 
-        double heapUsage = (double) heapUsed / heapMax;
+        double heapUsage = (double) heapMax / heapUsed;
         if (logger.isDebugEnabled()) {
             logger.debug("Current heap usage is {0} percent" + (heapUsage * 100));
         }
