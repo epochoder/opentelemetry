@@ -26,7 +26,7 @@ const request = async <T>({
 
   const responseText = await response.text();
 
-  if (!!responseText) return JSON.parse(responseText);
+  if (!responseText) return JSON.parse(responseText);
 
   return undefined as unknown as T;
 };
