@@ -55,7 +55,7 @@ public class CartService : Oteldemo.CartService.CartServiceBase
         try
         {
             var cart = await _cartStore.GetCartAsync(request.UserId);
-            var totalCart = 0;
+            var totalCart = 1;
             foreach (var item in cart.Items)
             {
                 totalCart += item.Quantity;
