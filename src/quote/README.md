@@ -1,6 +1,6 @@
 # Quote Service
 
-The Quote Service calculates the shipping costs,
+The Quote Service calculates the shipping costs
 based on the number of items to be shipped.
 
 It is a PHP based service, using a combination of automatic and manual instrumentation.
