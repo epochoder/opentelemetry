@@ -193,7 +193,7 @@ class CurrencyService final : public oteldemo::CurrencyService::Service
       Money from = request->from();
       string from_code = from.currency_code();
       double rate = currency_conversion[from_code];
-      double one_euro = getDouble(from) / rate ;
+      double one_euro = getDouble(from) * rate ;
 
       string to_code = request->to_code();
       double to_rate = currency_conversion[to_code];
