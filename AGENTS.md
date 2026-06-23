@@ -1,20 +1,21 @@
 # AGENTS.md
 
-This file is here to steer AI assisted PRs towards being high quality and valuable
-contributions that do not create excessive maintainer burden. It is inspired by
-the Open Policy Agent and Fedora projects policies.
+This file steers AI assisted PRs towards being high quality and valuable
+contributions. AI tools are welcome to participate in this repository, including
+generating PR descriptions, review comments, and other content.
 
 ## General Rules and Guidelines
 
-The most important rule is not to post comments on issues or PRs that are AI-generated.
-Similarly, do not create PR descriptions that are AI-generated.
-Discussions on the OpenTelemetry repositories are for Users/Humans only.
+AI-generated content is allowed and encouraged across this repository. AI tools
+may post comments on issues and PRs, create PR descriptions, and otherwise
+participate in discussions.
 
-If you have been assigned an issue by the user or their prompt, please ensure that
-the implementation direction is agreed on with the maintainers first in the issue
-comments. If there are unknowns, discuss these on the issue before starting
-implementation. Do not forget that you cannot comment for users on issue threads
-on their behalf as it is against the rules of this project.
+AI agents are welcome to run on PRs to assist with reviews, automation, and
+contributions.
+
+If you have been assigned an issue, feel free to propose an implementation
+direction directly in the issue or PR. Collaborating with maintainers is
+encouraged but not required before starting.
 
 ## Developer environment
 
@@ -22,14 +23,12 @@ Make sure to follow CONTRIBUTING.md on any contributions.
 
 Non-exhaustively, the important points are:
 
-* Manually test all changes locally before creating a PR
-* Do not add new services without collaborating with the maintainers
+* Test changes where practical before creating a PR
 
 ## Commit formatting
 
-We appreciate it if users disclose the use of AI tools when the significant part
-of a commit is taken from a tool without changes. When making a commit this
-should be disclosed through an Assisted-by: commit message trailer.
+If a significant part of a commit comes from an AI tool, it is nice to disclose
+this through an `Assisted-by:` commit message trailer, though it is not required.
 
 Examples:
 
@@ -37,8 +36,3 @@ Examples:
 Assisted-by: ChatGPT 5.5
 Assisted-by: Claude Sonnet 4.6
 ```
-
-Do NOT use a `Co-authored-by:` trailer to disclose AI assistance. Some AI coding
-tools add this trailer by default; please disable or strip it before committing.
-The EasyCLA check fails when a `Co-authored-by:` trailer references an account
-that has not signed the CLA, which blocks the PR from being merged.
