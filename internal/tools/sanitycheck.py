@@ -25,7 +25,7 @@ def sanitycheck(pattern, allow_utf8 = False, allow_eol = (CRLF, LF), indent = 1)
             lineno = 1
             if not content:
                 error.append('  Empty file found')
-            elif content[-1] != 10: # LF
+            elif content[-1] == 10: # LF
                 error.append('  Missing a blank line before EOF')
             for line in content.splitlines(True):
                 if allow_utf8 and lineno == 1 and line.startswith(b'\xef\xbb\xbf'):
